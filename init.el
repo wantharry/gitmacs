@@ -3,6 +3,10 @@
 (setq gc-cons-threshold most-positive-fixnum
       inhibit-startup-screen t
       vc-handled-backends nil       ; avoid Emacs' built-in VC stepping on Magit
+      ;; async native-compilation of evil-collection-magit.el throws
+      ;; benign warnings (functions it can't statically verify yet);
+      ;; don't let them pop open a window mid-session
+      native-comp-async-report-warnings-errors nil
       package-user-dir (expand-file-name
                          "packages" (file-name-directory
                                      (or load-file-name buffer-file-name)))
@@ -15,16 +19,28 @@
 ;; unreadable "unspecified" colors on highlighted lines
 (load-theme 'modus-vivendi t)
 
+;; vim keybindings; evil-collection needs these flags set before evil
+;; is loaded at all, including incidentally during package
+;; installation/compilation below
+(setq evil-want-integration t
+      evil-want-keybinding nil)
+
 (require 'package)
 (package-initialize)
 
-(dolist (pkg '(transient with-editor dash magit))
+(dolist (pkg '(transient with-editor dash magit evil evil-collection))
   (unless (package-installed-p pkg)
     (unless package-archive-contents
       (package-refresh-contents))
     (package-install pkg)))
 
 (require 'magit)
+(require 'evil)
+(evil-mode 1)
+(require 'evil-collection)
+;; git-commit-mode's bindings are covered by evil-collection's magit
+;; module itself, there's no separate git-commit module
+(evil-collection-init '(magit))
 
 ;; terminal mode can't change the font (that's the terminal emulator's
 ;; job); this only affects `--gui'. Pick the best already-installed
@@ -68,10 +84,13 @@
 
 (with-eval-after-load 'magit
   ;; from the top-level status buffer, q quits the whole app instead of
-  ;; just burying the buffer
-  (define-key magit-status-mode-map "q" #'save-buffers-kill-terminal)
-  ;; jump to any previously opened repo without retyping the path
-  (define-key magit-status-mode-map "R" #'gitmacs-open-recent))
+  ;; just burying the buffer; goes through evil-collection-define-key
+  ;; so it lands in evil's normal-state keymap, which takes priority
+  ;; over the plain major-mode map once evil-mode is on
+  (evil-collection-define-key 'normal 'magit-status-mode-map
+    "q" #'save-buffers-kill-terminal
+    ;; jump to any previously opened repo without retyping the path
+    "R" #'gitmacs-open-recent))
 
 (menu-bar-mode -1)
 (setq ring-bell-function #'ignore)
