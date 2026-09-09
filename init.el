@@ -32,6 +32,7 @@
   (define-key magit-status-mode-map "q" #'save-buffers-kill-terminal))
 
 (menu-bar-mode -1)
+(setq ring-bell-function #'ignore)
 
 (unless noninteractive
   (magit-status default-directory)
