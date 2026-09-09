@@ -10,19 +10,35 @@
                           ("nongnu" . "https://elpa.nongnu.org/nongnu/")
                           ("melpa"  . "https://melpa.org/packages/")))
 
-;; a real theme with explicit fg/bg on every face (region, hl-line,
-;; magit-section-highlight, ...) so terminal mode never falls back to
-;; unreadable "unspecified" colors on highlighted lines
-(load-theme 'modus-vivendi t)
-
 (require 'package)
 (package-initialize)
 
-(dolist (pkg '(transient with-editor dash magit))
-  (unless (package-installed-p pkg)
-    (unless package-archive-contents
-      (package-refresh-contents))
-    (package-install pkg)))
+;; native-compiling a package (below) runs in its own subprocess, whose
+;; warnings don't answer to this process's `warning-minimum-level' --
+;; the only thing that reliably stops the harmless first-run compiler
+;; warnings from popping up their own window is refusing to give the
+;; *Warnings* buffer a window at all. It still exists if ever needed
+;; (`C-x b *Warnings*'), it just never grabs the screen on its own.
+(add-to-list 'display-buffer-alist
+             '("\\*Warnings\\*"
+               (display-buffer-no-window)
+               (allow-no-window . t)))
+
+;; first-time compilation of a package can emit harmless byte-compile
+;; warnings; nothing here is fatal (ignore-errors below still catches
+;; real failures), so keep it quiet
+(let ((warning-minimum-level :error)
+      (byte-compile-warnings nil))
+  (dolist (pkg '(transient with-editor dash magit doom-themes doom-modeline nerd-icons))
+    (unless (package-installed-p pkg)
+      (unless package-archive-contents
+        (package-refresh-contents))
+      (package-install pkg))))
+
+;; a real theme with explicit fg/bg on every face (region, hl-line,
+;; magit-section-highlight, ...) so terminal mode never falls back to
+;; unreadable "unspecified" colors on highlighted lines
+(load-theme 'doom-tokyo-night t)
 
 ;; native-compiling the bundled packages is a few seconds of one-time
 ;; work; without this it happens lazily in the background the first
@@ -31,13 +47,22 @@
 (when (native-comp-available-p)
   (let ((stamp (expand-file-name ".native-compiled" package-user-dir)))
     (unless (file-exists-p stamp)
-      (let ((native-comp-async-report-warnings-errors 'silent))
+      (let ((native-comp-async-report-warnings-errors 'silent)
+            (warning-minimum-level :error)
+            (byte-compile-warnings nil))
         (dolist (f (directory-files-recursively package-user-dir "\\.el\\'"))
           (unless (string-match-p "-autoloads\\.el\\'\\|-pkg\\.el\\'" f)
             (ignore-errors (native-compile f)))))
       (with-temp-file stamp ""))))
 
 (require 'magit)
+
+;; a richer modeline (git branch, mode, position) matching the theme;
+;; icons only in --gui since a plain terminal usually lacks the Nerd
+;; Font glyphs and would just show missing-glyph boxes instead
+(require 'doom-modeline)
+(setq doom-modeline-icon (display-graphic-p))
+(doom-modeline-mode 1)
 
 ;; word-level highlighting within a changed line, not just "this line
 ;; differs" -- much easier to see what actually changed
