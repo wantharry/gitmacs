@@ -18,22 +18,74 @@
 (require 'package)
 (package-initialize)
 
-(dolist (pkg '(transient with-editor dash magit))
+(dolist (pkg '(transient with-editor dash magit forge magit-delta git-timemachine magit-todos))
   (unless (package-installed-p pkg)
     (unless package-archive-contents
       (package-refresh-contents))
     (package-install pkg)))
 
 (require 'magit)
+(require 'forge)
+(require 'magit-todos)
+(magit-todos-mode 1)
+
+;; magit-delta needs the external `delta' binary; skip quietly if it's
+;; not on PATH instead of erroring
+(when (executable-find "delta")
+  (require 'magit-delta)
+  (magit-delta-mode 1))
+
+;; terminal mode can't change the font (that's the terminal emulator's
+;; job); this only affects `--gui'. Pick the best already-installed
+;; font instead of bundling one, since fonts have to be OS-registered
+;; to be usable, unlike a plain binary or Elisp file
+(when (display-graphic-p)
+  (let ((font (seq-find (lambda (f) (member f (font-family-list)))
+                         '("Cascadia Code" "Cascadia Mono" "JetBrains Mono"
+                           "Fira Code" "Consolas" "DejaVu Sans Mono"))))
+    (when font
+      (set-face-attribute 'default nil :font font :height 120))))
+
+(defvar gitmacs-recent-file
+  (expand-file-name "recent-repos.el"
+                     (file-name-directory (or load-file-name buffer-file-name))))
+
+(defvar gitmacs-recent-repos
+  (when (file-exists-p gitmacs-recent-file)
+    (with-temp-buffer
+      (insert-file-contents gitmacs-recent-file)
+      (ignore-errors (read (current-buffer))))))
+
+(defun gitmacs--remember-repo (dir)
+  (setq gitmacs-recent-repos
+        (seq-take (cons dir (delete dir (copy-sequence gitmacs-recent-repos))) 10))
+  (with-temp-file gitmacs-recent-file
+    (prin1 gitmacs-recent-repos (current-buffer))))
+
+(defun gitmacs-open (dir)
+  "Open Magit status for DIR and remember it in the recent list."
+  (magit-status dir)
+  (gitmacs--remember-repo (magit-toplevel dir))
+  (delete-other-windows))
+
+(defun gitmacs-open-recent ()
+  "Pick a repo from the recently opened list and open it."
+  (interactive)
+  (if gitmacs-recent-repos
+      (gitmacs-open (completing-read "Open repo: " gitmacs-recent-repos nil t))
+    (gitmacs-open (read-directory-name "Open repo: "))))
 
 (with-eval-after-load 'magit
   ;; from the top-level status buffer, q quits the whole app instead of
   ;; just burying the buffer
-  (define-key magit-status-mode-map "q" #'save-buffers-kill-terminal))
+  (define-key magit-status-mode-map "q" #'save-buffers-kill-terminal)
+  ;; jump to any previously opened repo without retyping the path
+  (define-key magit-status-mode-map "R" #'gitmacs-open-recent))
 
 (menu-bar-mode -1)
 (setq ring-bell-function #'ignore)
 
 (unless noninteractive
-  (magit-status default-directory)
-  (delete-other-windows))
+  (if (magit-toplevel default-directory)
+      (gitmacs-open default-directory)
+    (gitmacs-open-recent)))

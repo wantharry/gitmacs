@@ -20,6 +20,8 @@ if errorlevel 1 (
   exit /b 1
 )
 
+set "PATH=%~dp0;%PATH%"
+
 pushd "%TARGET_DIR%" || (pause & exit /b 1)
 emacs %EMACS_ARGS% --load "%GITMACS_HOME%init.el"
 popd
