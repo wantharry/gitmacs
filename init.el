@@ -39,8 +39,10 @@
 (evil-mode 1)
 (require 'evil-collection)
 ;; git-commit-mode's bindings are covered by evil-collection's magit
-;; module itself, there's no separate git-commit module
-(evil-collection-init '(magit))
+;; module itself, there's no separate git-commit module. dired needs
+;; its own module too, otherwise evil's default RET (move down a
+;; line, real Vim behavior) shadows dired-find-file
+(evil-collection-init '(magit dired))
 
 ;; terminal mode can't change the font (that's the terminal emulator's
 ;; job); this only affects `--gui'. Pick the best already-installed
