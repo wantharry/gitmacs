@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SELF="$(readlink -f "${BASH_SOURCE[0]}")"
+GITMACS_HOME="$(cd "$(dirname "$SELF")/.." && pwd)"
+
+ARGS=(-Q)
+if [[ "${1:-}" == "--gui" ]]; then
+  shift
+else
+  ARGS+=(-nw)
+fi
+
+cd "${1:-.}"
+
+exec emacs "${ARGS[@]}" --load "$GITMACS_HOME/init.el"
