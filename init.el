@@ -73,12 +73,16 @@
       (set-face-attribute 'default nil :font font :height 120))))
 
 (defvar gitmacs-recent-file (expand-file-name "recent-repos.el" gitmacs-home))
+(defvar gitmacs-visits-file (expand-file-name "visit-counts.el" gitmacs-home))
 
-(defvar gitmacs-recent-repos
-  (when (file-exists-p gitmacs-recent-file)
+(defun gitmacs--read-data-file (file)
+  (when (file-exists-p file)
     (with-temp-buffer
-      (insert-file-contents gitmacs-recent-file)
+      (insert-file-contents file)
       (ignore-errors (read (current-buffer))))))
+
+(defvar gitmacs-recent-repos (gitmacs--read-data-file gitmacs-recent-file))
+(defvar gitmacs-visit-counts (gitmacs--read-data-file gitmacs-visits-file))
 
 (defun gitmacs--remember-repo (dir)
   (setq gitmacs-recent-repos
@@ -86,17 +90,91 @@
   (with-temp-file gitmacs-recent-file
     (prin1 gitmacs-recent-repos (current-buffer))))
 
+(defun gitmacs--record-visit (dir)
+  (let ((cell (assoc dir gitmacs-visit-counts)))
+    (if cell
+        (setcdr cell (1+ (cdr cell)))
+      (push (cons dir 1) gitmacs-visit-counts)))
+  (with-temp-file gitmacs-visits-file
+    (prin1 gitmacs-visit-counts (current-buffer))))
+
+(defun gitmacs--most-visited (n)
+  (mapcar #'car
+          (seq-take (sort (copy-sequence gitmacs-visit-counts)
+                           (lambda (a b) (> (cdr a) (cdr b))))
+                    n)))
+
 (defun gitmacs-open (dir)
-  "Open Magit status for DIR and remember it in the recent list."
+  "Open Magit status for DIR and remember it in the recent/visit lists."
   (magit-status dir)
-  (gitmacs--remember-repo (magit-toplevel dir))
+  (let ((top (magit-toplevel dir)))
+    (gitmacs--remember-repo top)
+    (gitmacs--record-visit top))
   (delete-other-windows))
 
-(defun gitmacs-open-recent ()
-  "Pick a repo from the recently opened list and open it."
+;; the landing page shown when gitmacs is started outside a repo, or
+;; via `R' from any status buffer: your 10 most recent repos and your
+;; 10 most-visited ones, each a line you can jump into with RET
+(defvar gitmacs-dashboard-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "RET") #'gitmacs-dashboard-visit)
+    (define-key map "n" #'next-line)
+    (define-key map "p" #'previous-line)
+    (define-key map "g" #'gitmacs-dashboard-refresh)
+    (define-key map "o" #'gitmacs-dashboard-open-other)
+    (define-key map "q" #'save-buffers-kill-terminal)
+    map))
+
+(define-derived-mode gitmacs-dashboard-mode special-mode "Gitmacs"
+  "Landing page listing recent and most-visited repos."
+  (hl-line-mode 1))
+
+(defun gitmacs--dashboard-insert-section (title dirs)
+  (when dirs
+    (insert (propertize title 'face 'magit-section-heading) "\n")
+    (dolist (dir dirs)
+      (insert (propertize (abbreviate-file-name dir) 'gitmacs-dir dir) "\n"))
+    (insert "\n")))
+
+(defun gitmacs-dashboard-refresh ()
   (interactive)
-  (if gitmacs-recent-repos
-      (gitmacs-open (completing-read "Open repo: " gitmacs-recent-repos nil t))
+  (let ((inhibit-read-only t)
+        (line (line-number-at-pos)))
+    (erase-buffer)
+    (insert (propertize "gitmacs\n\n" 'face 'bold))
+    (gitmacs--dashboard-insert-section
+     (format "Recent (%d)" (length gitmacs-recent-repos))
+     gitmacs-recent-repos)
+    (gitmacs--dashboard-insert-section
+     (format "Most visited (%d)" (length (gitmacs--most-visited 10)))
+     (gitmacs--most-visited 10))
+    (insert (propertize "RET" 'face 'bold) " open   "
+            (propertize "o" 'face 'bold) " open other   "
+            (propertize "g" 'face 'bold) " refresh   "
+            (propertize "q" 'face 'bold) " quit\n")
+    (goto-char (point-min))
+    (forward-line (min line 2))))
+
+(defun gitmacs-dashboard-visit ()
+  (interactive)
+  (let ((dir (get-text-property (line-beginning-position) 'gitmacs-dir)))
+    (if dir
+        (gitmacs-open dir)
+      (message "No repo on this line"))))
+
+(defun gitmacs-dashboard-open-other ()
+  (interactive)
+  (gitmacs-open (read-directory-name "Open repo: ")))
+
+(defun gitmacs-open-recent ()
+  "Show the recent/most-visited dashboard, or prompt if there's no history yet."
+  (interactive)
+  (if (or gitmacs-recent-repos gitmacs-visit-counts)
+      (progn
+        (switch-to-buffer (get-buffer-create "*gitmacs*"))
+        (gitmacs-dashboard-mode)
+        (gitmacs-dashboard-refresh)
+        (delete-other-windows))
     (gitmacs-open (read-directory-name "Open repo: "))))
 
 (with-eval-after-load 'magit

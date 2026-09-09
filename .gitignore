@@ -1,4 +1,5 @@
 /packages/
 *.elc
 /recent-repos.el
+/visit-counts.el
 /custom.el
