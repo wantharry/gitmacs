@@ -1,11 +1,11 @@
 ;;; init.el --- minimal magit-only launcher -*- lexical-binding: t; -*-
 
+(defvar gitmacs-home (file-name-directory (or load-file-name buffer-file-name)))
+
 (setq gc-cons-threshold most-positive-fixnum
       inhibit-startup-screen t
       vc-handled-backends nil       ; avoid Emacs' built-in VC stepping on Magit
-      package-user-dir (expand-file-name
-                         "packages" (file-name-directory
-                                     (or load-file-name buffer-file-name)))
+      package-user-dir (expand-file-name "packages" gitmacs-home)
       package-archives '(("gnu"    . "https://elpa.gnu.org/packages/")
                           ("nongnu" . "https://elpa.nongnu.org/nongnu/")
                           ("melpa"  . "https://melpa.org/packages/")))
@@ -39,6 +39,28 @@
 
 (require 'magit)
 
+;; word-level highlighting within a changed line, not just "this line
+;; differs" -- much easier to see what actually changed
+(setq magit-diff-refine-hunks 'all)
+
+;; unstaged/staged/stashes start expanded instead of needing a manual
+;; TAB on every single status view
+(setq magit-section-initial-visibility-alist
+      '((unstaged . show) (staged . show) (stashes . show)))
+
+;; line numbers and column position in any real file buffer (editing
+;; a conflict, writing a commit message); magit's own buffers
+;; (status/log/diff) navigate by section, not by line, so they're
+;; left alone
+(add-hook 'text-mode-hook #'display-line-numbers-mode)
+(add-hook 'prog-mode-hook #'display-line-numbers-mode)
+(column-number-mode 1)
+
+;; `M-x customize' writes here instead of editing this file by hand;
+;; loaded back on every startup so changes persist
+(setq custom-file (expand-file-name "custom.el" gitmacs-home))
+(load custom-file 'noerror)
+
 ;; terminal mode can't change the font (that's the terminal emulator's
 ;; job); this only affects `--gui'. Pick the best already-installed
 ;; font instead of bundling one, since fonts have to be OS-registered
@@ -50,9 +72,7 @@
     (when font
       (set-face-attribute 'default nil :font font :height 120))))
 
-(defvar gitmacs-recent-file
-  (expand-file-name "recent-repos.el"
-                     (file-name-directory (or load-file-name buffer-file-name))))
+(defvar gitmacs-recent-file (expand-file-name "recent-repos.el" gitmacs-home))
 
 (defvar gitmacs-recent-repos
   (when (file-exists-p gitmacs-recent-file)
