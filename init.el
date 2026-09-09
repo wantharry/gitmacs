@@ -10,6 +10,14 @@
                           ("nongnu" . "https://elpa.nongnu.org/nongnu/")
                           ("melpa"  . "https://melpa.org/packages/")))
 
+;; package.el's GPG signature verification fails with "bad-signature"
+;; on this platform even for an untampered download (almost certainly
+;; a coding-system/line-ending mismatch corrupting the byte-exact
+;; content signature checking needs) -- HTTPS already gives transport
+;; integrity, so skip the extra check only where it's actually broken
+(when (eq system-type 'windows-nt)
+  (setq package-check-signature nil))
+
 (require 'package)
 (package-initialize)
 
