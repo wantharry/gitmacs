@@ -3,14 +3,27 @@ set -euo pipefail
 
 SELF="$(readlink -f "${BASH_SOURCE[0]}")"
 GITMACS_HOME="$(cd "$(dirname "$SELF")/.." && pwd)"
+SOCKET_NAME="gitmacs"
 
-ARGS=(-Q)
+GUI=
 if [[ "${1:-}" == "--gui" ]]; then
+  GUI=1
   shift
-else
-  ARGS+=(-nw)
 fi
 
-cd "${1:-.}"
+DIR="$(cd "${1:-.}" && pwd)"
 
-exec emacs "${ARGS[@]}" --load "$GITMACS_HOME/init.el"
+# a persistent daemon means package/theme/magit loading only happens
+# once; every later launch just opens a client frame against it
+if ! emacsclient -s "$SOCKET_NAME" --eval nil >/dev/null 2>&1; then
+  emacs --daemon="$SOCKET_NAME" -Q --load "$GITMACS_HOME/init.el"
+fi
+
+ESCAPED_DIR=${DIR//\\/\\\\}
+ESCAPED_DIR=${ESCAPED_DIR//\"/\\\"}
+
+if [[ -n "$GUI" ]]; then
+  exec emacsclient -c -s "$SOCKET_NAME" --eval "(gitmacs-open \"$ESCAPED_DIR\")"
+else
+  exec emacsclient -nw -s "$SOCKET_NAME" --eval "(gitmacs-open \"$ESCAPED_DIR\")"
+fi

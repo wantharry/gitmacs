@@ -21,4 +21,4 @@ case ":$PATH:" in
     ;;
 esac
 
-echo "First run will download magit + deps from GNU ELPA/MELPA (needs network) and byte-compile them; after that it starts in well under a second."
+echo "First run will download magit + deps from GNU ELPA/MELPA (needs network), byte- and native-compile them, and start a background daemon; that first run takes a few seconds, every run after that opens in well under a second. The daemon keeps running between launches (it doesn't cost anything idle); kill it with 'emacsclient -s gitmacs --eval \"(kill-emacs)\"' if you ever want to stop it."

@@ -2,11 +2,12 @@
 setlocal
 
 set "GITMACS_HOME=%~dp0"
-set "EMACS_ARGS=-Q -nw"
+set "SOCKET_NAME=gitmacs"
+set "CLIENT_ARGS=-nw"
 set "TARGET_DIR=%~dp0"
 
 if "%~1"=="--gui" (
-  set "EMACS_ARGS=-Q"
+  set "CLIENT_ARGS=-c"
   shift
 )
 
@@ -21,5 +22,14 @@ if errorlevel 1 (
 )
 
 pushd "%TARGET_DIR%" || (pause & exit /b 1)
-emacs %EMACS_ARGS% --load "%GITMACS_HOME%init.el"
+set "TARGET_DIR=%CD%"
 popd
+
+rem a persistent daemon means package/theme/magit loading only happens
+rem once; every later launch just opens a client frame against it
+emacsclient -s "%SOCKET_NAME%" --eval "nil" >nul 2>nul
+if errorlevel 1 (
+  emacs --daemon="%SOCKET_NAME%" -Q --load "%GITMACS_HOME%init.el"
+)
+
+emacsclient %CLIENT_ARGS% -s "%SOCKET_NAME%" --eval "(gitmacs-open \"%TARGET_DIR:\=/%\")"

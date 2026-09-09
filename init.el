@@ -24,6 +24,19 @@
       (package-refresh-contents))
     (package-install pkg)))
 
+;; native-compiling the bundled packages is a few seconds of one-time
+;; work; without this it happens lazily in the background the first
+;; time each file is used, which is fine but makes early commands
+;; janky. The stamp file makes this run exactly once per package set.
+(when (native-comp-available-p)
+  (let ((stamp (expand-file-name ".native-compiled" package-user-dir)))
+    (unless (file-exists-p stamp)
+      (let ((native-comp-async-report-warnings-errors 'silent))
+        (dolist (f (directory-files-recursively package-user-dir "\\.el\\'"))
+          (unless (string-match-p "-autoloads\\.el\\'\\|-pkg\\.el\\'" f)
+            (ignore-errors (native-compile f)))))
+      (with-temp-file stamp ""))))
+
 (require 'magit)
 
 ;; terminal mode can't change the font (that's the terminal emulator's
@@ -76,7 +89,10 @@
 (menu-bar-mode -1)
 (setq ring-bell-function #'ignore)
 
-(unless noninteractive
+;; when started as a daemon there's no meaningful default-directory or
+;; frame to open a repo into yet; `gitmacs' opens the repo explicitly
+;; over emacsclient once the daemon is up
+(unless (or noninteractive (daemonp))
   (if (magit-toplevel default-directory)
       (gitmacs-open default-directory)
     (gitmacs-open-recent)))
