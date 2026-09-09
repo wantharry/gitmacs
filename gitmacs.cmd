@@ -26,10 +26,29 @@ set "TARGET_DIR=%CD%"
 popd
 
 rem a persistent daemon means package/theme/magit loading only happens
-rem once; every later launch just opens a client frame against it
+rem once; every later launch just opens a client frame against it.
+rem `emacs --daemon' doesn't detach from the console on Windows the way
+rem it does on Unix, so it would just hang this script forever; runemacs
+rem is the console-free launcher Emacs ships specifically for this, so
+rem we start it that way and poll until the daemon answers instead of
+rem relying on the launch command blocking until it's ready.
 emacsclient -s "%SOCKET_NAME%" --eval "nil" >nul 2>nul
 if errorlevel 1 (
-  emacs --daemon="%SOCKET_NAME%" -Q --load "%GITMACS_HOME%init.el"
+  call :start_daemon
+  if errorlevel 1 exit /b 1
 )
 
 emacsclient %CLIENT_ARGS% -s "%SOCKET_NAME%" --eval "(gitmacs-open \"%TARGET_DIR:\=/%\")"
+exit /b 0
+
+:start_daemon
+echo Starting Emacs daemon (first launch only, later ones are instant)...
+start "" runemacs --daemon="%SOCKET_NAME%" -Q --load "%GITMACS_HOME%init.el"
+for /l %%i in (1,1,60) do (
+  emacsclient -s "%SOCKET_NAME%" --eval "nil" >nul 2>nul
+  if not errorlevel 1 exit /b 0
+  timeout /t 1 /nobreak >nul
+)
+echo Timed out waiting for the Emacs daemon to start.
+pause
+exit /b 1
