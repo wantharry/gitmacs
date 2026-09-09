@@ -2,9 +2,7 @@
 set -euo pipefail
 
 SELF="$(readlink -f "${BASH_SOURCE[0]}")"
-SELF_DIR="$(dirname "$SELF")"
-GITMACS_HOME="$(cd "$SELF_DIR/.." && pwd)"
-export PATH="$SELF_DIR:$PATH"
+GITMACS_HOME="$(cd "$(dirname "$SELF")/.." && pwd)"
 
 ARGS=(-Q)
 if [[ "${1:-}" == "--gui" ]]; then

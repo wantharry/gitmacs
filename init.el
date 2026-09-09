@@ -18,22 +18,13 @@
 (require 'package)
 (package-initialize)
 
-(dolist (pkg '(transient with-editor dash magit forge magit-delta git-timemachine magit-todos))
+(dolist (pkg '(transient with-editor dash magit))
   (unless (package-installed-p pkg)
     (unless package-archive-contents
       (package-refresh-contents))
     (package-install pkg)))
 
 (require 'magit)
-(require 'forge)
-(require 'magit-todos)
-(magit-todos-mode 1)
-
-;; magit-delta needs the external `delta' binary; skip quietly if it's
-;; not on PATH instead of erroring
-(when (executable-find "delta")
-  (require 'magit-delta)
-  (magit-delta-mode 1))
 
 ;; terminal mode can't change the font (that's the terminal emulator's
 ;; job); this only affects `--gui'. Pick the best already-installed
