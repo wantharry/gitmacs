@@ -81,8 +81,10 @@
       (insert-file-contents file)
       (ignore-errors (read (current-buffer))))))
 
-(defvar gitmacs-recent-repos (gitmacs--read-data-file gitmacs-recent-file))
-(defvar gitmacs-visit-counts (gitmacs--read-data-file gitmacs-visits-file))
+(defvar gitmacs-recent-repos
+  (seq-filter #'stringp (gitmacs--read-data-file gitmacs-recent-file)))
+(defvar gitmacs-visit-counts
+  (seq-filter (lambda (c) (stringp (car c))) (gitmacs--read-data-file gitmacs-visits-file)))
 
 (defun gitmacs--remember-repo (dir)
   (setq gitmacs-recent-repos
@@ -107,7 +109,7 @@
 (defun gitmacs-open (dir)
   "Open Magit status for DIR and remember it in the recent/visit lists."
   (magit-status dir)
-  (let ((top (magit-toplevel dir)))
+  (when-let ((top (magit-toplevel dir)))
     (gitmacs--remember-repo top)
     (gitmacs--record-visit top))
   (delete-other-windows))
