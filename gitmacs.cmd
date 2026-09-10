@@ -21,9 +21,8 @@ if errorlevel 1 (
   exit /b 1
 )
 
-pushd "%TARGET_DIR%" || (pause & exit /b 1)
+cd /d "%TARGET_DIR%" || (pause & exit /b 1)
 set "TARGET_DIR=%CD%"
-popd
 
 if defined GUI goto gui_mode
 
